@@ -1,8 +1,9 @@
-const path = require("path");
-const TerserPlugin = require("terser-webpack-plugin");
-const ExtractTextPlugin = require("extract-text-webpack-plugin");
+import path from 'path';
+import TerserPlugin from 'terser-webpack-plugin';
+import ExtractTextPlugin from 'extract-text-webpack-plugin';
+import { Configuration } from 'webpack';
 
-module.exports = [{
+const config: Configuration = {
     entry: {
         "quill.imageUploader": "./src/dist.js",
         demo: "./src/demo.js",
@@ -37,12 +38,13 @@ module.exports = [{
         ],
     },
     module: {
-        rules: [{
+        rules: [
+            {
                 test: /\.css$/,
                 use: ExtractTextPlugin.extract({
                     use: [{
                         loader: "css-loader",
-                    }, ],
+                    }],
                 }),
             },
             {
@@ -55,4 +57,6 @@ module.exports = [{
         ],
     },
     plugins: [new ExtractTextPlugin("quill.imageUploader.min.css")],
-}, ];
+};
+
+export default config;

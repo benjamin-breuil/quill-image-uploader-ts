@@ -1,18 +1,32 @@
-import LoadingImage from "./blots/image.js";
+import LoadingImage from "./blots/image";
+
+interface ImageUploaderOptions {
+    upload: (file: File) => Promise<string>;
+}
+
+interface DeltaOperation {
+    insert?: any;
+    [key: string]: any;
+}
 
 class ImageUploader {
-    constructor(quill, options) {
+    private quill: any;
+    private options: ImageUploaderOptions;
+    private range: any;
+    private placeholderDelta: any;
+    private fileHolder: HTMLInputElement | undefined;
+
+    constructor(quill: any, options: ImageUploaderOptions) {
         this.quill = quill;
         this.options = options;
-        this.range = null;             
-        this.placeholderDelta = null; 
+        this.range = null;
+        this.placeholderDelta = null;
 
-        if (typeof this.options.upload !== "function")
-            console.warn(
-                "[Missing config] upload function that returns a promise is required"
-            );
+        if (typeof this.options.upload !== "function") {
+            console.warn("[Missing config] upload function that returns a promise is required");
+        }
 
-        var toolbar = this.quill.getModule("toolbar");
+        const toolbar = this.quill.getModule("toolbar");
         if (toolbar) {
             toolbar.addHandler("image", this.selectLocalImage.bind(this));
         }
@@ -32,23 +46,20 @@ class ImageUploader {
         this.fileHolder.setAttribute("accept", "image/*");
         this.fileHolder.setAttribute("style", "visibility:hidden");
 
-        this.fileHolder.onchange = this.fileChanged.bind(this);
+        this.fileHolder.onchange = () => this.fileChanged();
 
         document.body.appendChild(this.fileHolder);
-
         this.fileHolder.click();
 
         window.requestAnimationFrame(() => {
-            document.body.removeChild(this.fileHolder);
+            if (this.fileHolder) {
+                document.body.removeChild(this.fileHolder);
+            }
         });
     }
 
-    handleDrop(evt) {
-        if (
-            evt.dataTransfer &&
-            evt.dataTransfer.files &&
-            evt.dataTransfer.files.length
-        ) {
+    handleDrop(evt: DragEvent) {
+        if (evt.dataTransfer && evt.dataTransfer.files && evt.dataTransfer.files.length) {
             evt.stopPropagation();
             evt.preventDefault();
             if (document.caretRangeFromPoint) {
@@ -77,7 +88,7 @@ class ImageUploader {
 
             this.quill.focus();
             this.range = this.quill.getSelection();
-            let file = evt.dataTransfer.files[0];
+            const file = evt.dataTransfer.files[0];
 
             setTimeout(() => {
                 this.quill.focus();
@@ -87,17 +98,16 @@ class ImageUploader {
         }
     }
 
-    handlePaste(evt) {
-        let clipboard = evt.clipboardData || window.clipboardData;
+    handlePaste(evt: ClipboardEvent) {
+        const clipboard = evt.clipboardData || (window as any).clipboardData;
 
-        // IE 11 is .files other browsers are .items
         if (clipboard && (clipboard.items || clipboard.files)) {
-            let items = clipboard.items || clipboard.files;
+            const items = clipboard.items || clipboard.files;
             const IMAGE_MIME_REGEX = /^image\/(jpe?g|gif|png|svg|webp)$/i;
 
             for (let i = 0; i < items.length; i++) {
                 if (IMAGE_MIME_REGEX.test(items[i].type)) {
-                    let file = items[i].getAsFile ? items[i].getAsFile() : items[i];
+                    const file = items[i].getAsFile ? items[i].getAsFile() : items[i];
 
                     if (file) {
                         this.quill.focus();
@@ -114,7 +124,7 @@ class ImageUploader {
         }
     }
 
-    readAndUploadFile(file) {
+    readAndUploadFile(file: File) {
         let isUploadReject = false;
 
         const fileReader = new FileReader();
@@ -123,7 +133,7 @@ class ImageUploader {
             "load",
             () => {
                 if (!isUploadReject) {
-                    let base64ImageSrc = fileReader.result;
+                    const base64ImageSrc = fileReader.result as string;
                     this.insertBase64Image(base64ImageSrc);
                 }
             },
@@ -135,10 +145,10 @@ class ImageUploader {
         }
 
         this.options.upload(file).then(
-            (imageUrl) => {
+            (imageUrl: string) => {
                 this.insertToEditor(imageUrl);
             },
-            (error) => {
+            (error: any) => {
                 isUploadReject = true;
                 this.removeBase64Image();
                 console.warn(error);
@@ -147,46 +157,48 @@ class ImageUploader {
     }
 
     fileChanged() {
-        const file = this.fileHolder.files[0];
-        this.readAndUploadFile(file);
+        if (this.fileHolder) {
+            const file = this.fileHolder.files ? this.fileHolder.files[0] : undefined;
+            if (file) {
+                this.readAndUploadFile(file);
+            }
+        }
     }
 
-    insertBase64Image(url) {
+    insertBase64Image(url: string) {
         const range = this.range;
-                
+
         this.placeholderDelta = this.quill.insertEmbed(
             range.index,
             LoadingImage.blotName,
-            `${url}`,
+            url,
             "user"
         );
     }
 
-    insertToEditor(url) {
-        const range = this.range;        
+    insertToEditor(url: string) {
+        const range = this.range;
 
-        const lengthToDelete = this.calculatePlaceholderInsertLength();        
-        
-        // Delete the placeholder image
+        const lengthToDelete = this.calculatePlaceholderInsertLength();
+
         this.quill.deleteText(range.index, lengthToDelete, "user");
-        // Insert the server saved image
-        this.quill.insertEmbed(range.index, "image", `${url}`, "user");
+        this.quill.insertEmbed(range.index, "image", url, "user");
 
         range.index++;
         this.quill.setSelection(range, "user");
     }
 
-    // The length of the insert delta from insertBase64Image can vary depending on what part of the line the insert occurs
-    calculatePlaceholderInsertLength() {
-        return this.placeholderDelta.ops.reduce((accumulator, deltaOperation) => {            
-            if (deltaOperation.hasOwnProperty('insert'))
+    calculatePlaceholderInsertLength(): number {
+        return this.placeholderDelta.ops.reduce((accumulator: number, deltaOperation: DeltaOperation) => {
+            if (deltaOperation.hasOwnProperty('insert')) {
                 accumulator++;
+            }
 
             return accumulator;
         }, 0);
     }
 
-    removeBase64Image() {        
+    removeBase64Image() {
         const range = this.range;
         const lengthToDelete = this.calculatePlaceholderInsertLength();
 
@@ -194,5 +206,5 @@ class ImageUploader {
     }
 }
 
-window.ImageUploader = ImageUploader;
+(window as any).ImageUploader = ImageUploader;
 export default ImageUploader;

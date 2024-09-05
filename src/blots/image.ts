@@ -2,8 +2,13 @@ import Quill from "quill";
 
 const InlineBlot = Quill.import("blots/block");
 
+interface ImageBlotData {
+    src: string;
+    custom?: string;
+}
+
 class LoadingImage extends InlineBlot {
-    static create(src) {
+    static create(src: string | boolean): HTMLElement {
         const node = super.create(src);
         if (src === true) return node;
 
@@ -12,19 +17,22 @@ class LoadingImage extends InlineBlot {
         node.appendChild(image);
         return node;
     }
-    deleteAt(index, length) {
+
+    deleteAt(index: number, length: number): void {
         super.deleteAt(index, length);
-        this.cache = {};
+        (this as any).cache = {}; // Assuming `cache` is a property of InlineBlot
     }
-    static value(domNode) {
+
+    static value(domNode: HTMLElement): ImageBlotData {
         const { src, custom } = domNode.dataset;
-        return { src, custom };
+        return { src: src ?? '', custom };
     }
 }
 
 LoadingImage.blotName = "imageBlot";
 LoadingImage.className = "image-uploading";
 LoadingImage.tagName = "span";
+
 Quill.register({ "formats/imageBlot": LoadingImage });
 
 export default LoadingImage;
